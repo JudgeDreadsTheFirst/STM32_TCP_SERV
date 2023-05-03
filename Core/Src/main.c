@@ -321,7 +321,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 }
 
-static void tcp_server_thread (void * p_arg)
+static void server_thread (void * p_arg)
 {
 	struct sockaddr_in server_addr; // адрес сервера
 	struct sockaddr_in conn_addr; // адрес подключения
@@ -430,9 +430,9 @@ static void tcp_server_thread (void * p_arg)
 	}
 }
 
- void tcp_server_init (void) // инициализация TCP-сервера
+ void tcp_init (void) // инициализация TCP-сервера
 {
-	sys_thread_new("tcp_server_thread",  tcp_server_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO - 1);
+	sys_thread_new("tcp_server_thread",  server_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO - 1);
 }
 /* USER CODE END 4 */
 
@@ -451,7 +451,7 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	tcp_server_init();
+	tcp_init();
     osDelay(100);
   }
   /* USER CODE END 5 */
