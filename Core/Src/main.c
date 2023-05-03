@@ -332,7 +332,7 @@ static void server_thread (void * p_arg)
 	int length;
 	int num;
 
-
+	int closed = 0; //флаг для проверки сокета клиента
 
 	 sock_fd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // установить новое соединение с сокетом
 	 memset (& server_addr, 0, sizeof (server_addr)); // Очистить адрес сервера
@@ -363,12 +363,23 @@ static void server_thread (void * p_arg)
 
 	while (1)//TODO:исправить, то что сервер читает escape последовательности
 	{
+		if (closed==1){ //если сокет клиента закрыт позволяем ему переподлючиться
+			sock_conn = accept (sock_fd, (struct sockaddr *) & conn_addr, & addr_len); // Подключиться к прослушиваемому запросу и присвоить статус sock_conn
+
+			if (sock_conn <0) // Если состояние меньше 0, это указывает на то, что соединение неисправно
+			{
+				closesocket(sock_fd);
+			}
+			else send (sock_conn, "connect success! \n \r", 22, 0);
+
+			closed = 0;
+		}
 		memset (data_buffer, 0, sizeof (data_buffer)); // Очистить приемный буфер
 
 		length = recv (sock_conn, (unsigned int *) data_buffer, 100, 0); // помещаем полученные данные в приемный буфер
-        if(length == 0){
-        	continue;
-        }
+        	if(length == 0){
+        		continue;
+        	}
 
 		for (num = 0; num <100; num ++)
 		{
@@ -399,16 +410,16 @@ static void server_thread (void * p_arg)
 			send (sock_conn, "LED3 включен \n \r", strlen("LED3 включен \n \r"), 1);
 		}
 		else if(tcp_server_recvbuf[0] =='S' & tcp_server_recvbuf[1]=='T' & tcp_server_recvbuf[2]=='A' & tcp_server_recvbuf[3]=='T'){
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET & HAL_GPIO_ReadPin(GPIOB, LD2_Pin) ==GPIO_PIN_SET){
+			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET &HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_SET){
 				send (sock_conn, "LED2 и LED3 включен \n \r", strlen("LED2 и LED3 включен \n \r"), 1);
 			}
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD2_Pin) ==GPIO_PIN_SET){
+			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_SET){
 				send (sock_conn, "LED2 включен и LED3 включен \n \r", strlen("LED2 включен и LED3 включен \n \r"), 1);
 			}
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD2_Pin) ==GPIO_PIN_RESET){
+			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_RESET){
 				send (sock_conn, "LED2 и LED3 выключен \n \r", strlen ("LED2 и LED3 выключен \n \r"), 1);
 			}
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET & HAL_GPIO_ReadPin(GPIOB, LD2_Pin) ==GPIO_PIN_RESET){
+			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_RESET){
 				send (sock_conn, "LED2 включен и LED3 выключен \n \r", strlen ("LED2 включен и LED3 выключен \n \r"), 1);
 			}
 		}
