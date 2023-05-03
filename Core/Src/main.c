@@ -430,7 +430,7 @@ static void server_thread (void * p_arg)
 	}
 }
 
- void tcp_init (void) // инициализация TCP-сервера
+ void tcp_serv_init (void) // инициализация TCP-сервера
 {
 	sys_thread_new("tcp_server_thread",  server_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO - 1);
 }
@@ -451,7 +451,7 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	tcp_init();
+	tcp_serv_init();
     osDelay(100);
   }
   /* USER CODE END 5 */
