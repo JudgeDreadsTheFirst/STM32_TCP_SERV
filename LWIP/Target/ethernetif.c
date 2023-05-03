@@ -652,11 +652,15 @@ void ethernetif_set_link(void const *argument)
     {
       /* network cable is connected */
       netif_set_link_up(link_arg->netif);
+      HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
     }
     else if(netif_is_link_up(link_arg->netif) && (!regvalue))
     {
       /* network cable is dis-connected */
       netif_set_link_down(link_arg->netif);
+      HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
     }
 
     /* Suspend thread for 200 ms */
