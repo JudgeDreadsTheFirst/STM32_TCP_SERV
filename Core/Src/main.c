@@ -321,49 +321,77 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 }
 
-static void server_thread (void * p_arg)
+int message_process(char tcp_server_recvbuf[],int sock_conn){// Переписать эту функцию по нормальному
+
+			if(tcp_server_recvbuf[0] == 0){//TODO: исправить проверку сообщений
+				send (sock_conn, "empty message \n ", strlen ("empty message \n"), 1);
+				return 0;
+			}
+			else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='2' & tcp_server_recvbuf[4]=='O' & tcp_server_recvbuf[5]=='F' & tcp_server_recvbuf[5]=='F')
+			{
+				HAL_GPIO_WritePin (GPIOB, LD2_Pin, GPIO_PIN_RESET);
+				send (sock_conn, "LED2 выключен \n \r", strlen ("LED2 выключен \n \r"), 1);
+				return 0;
+		    }
+			else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='2' & tcp_server_recvbuf[4]=='O' & tcp_server_recvbuf[5]=='N')
+			{
+				HAL_GPIO_WritePin (GPIOB, LD2_Pin, GPIO_PIN_SET);
+				send (sock_conn, "LED2 включен \n \r",  strlen("LED2 включен \n \r"),1);
+				return 0;
+			}
+			else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='3' & tcp_server_recvbuf[4]=='O' & tcp_server_recvbuf[5]=='F' & tcp_server_recvbuf[5]=='F')
+			{
+				HAL_GPIO_WritePin (GPIOB, LD3_Pin, GPIO_PIN_RESET);
+				send (sock_conn, "LED3 выключен \n \r", strlen("LED3 выключен \n \r"), 1);
+				return 0;
+			}
+			else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E'&tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='3'&tcp_server_recvbuf[4]=='O'&tcp_server_recvbuf[5]=='N')
+			{
+				HAL_GPIO_WritePin (GPIOB, LD3_Pin, GPIO_PIN_SET);
+				send (sock_conn, "LED3 включен \n \r", strlen("LED3 включен \n \r"), 1);
+				return 0;
+			}
+			else if(tcp_server_recvbuf[0] =='S' & tcp_server_recvbuf[1]=='T' & tcp_server_recvbuf[2]=='A' & tcp_server_recvbuf[3]=='T'){
+				if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_SET){
+					send (sock_conn, "LED2 и LED3 включен \n \r", strlen("LED2 и LED3 включен \n \r"), 1);
+				}
+				if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_SET){
+					send (sock_conn, "LED2 включен и LED3 включен \n \r", strlen("LED2 включен и LED3 включен \n \r"), 1);
+				}
+				if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_RESET){
+					send (sock_conn, "LED2 и LED3 выключен \n \r", strlen ("LED2 и LED3 выключен \n \r"), 1);
+				}
+				if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_RESET){
+					send (sock_conn, "LED2 включен и LED3 выключен \n \r", strlen ("LED2 включен и LED3 выключен \n \r"), 1);
+				}
+				return 0;
+			}
+			else if(tcp_server_recvbuf[0] =='E' & tcp_server_recvbuf[1]=='X' & tcp_server_recvbuf[2]=='T'){
+				closesocket(sock_conn);
+				return 1;
+			}
+			else if(tcp_server_recvbuf[0] =='H' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='L' & tcp_server_recvbuf[3]=='P'){
+				send (sock_conn, "--------------------- \n \r", strlen ("--------------------- \n \r"), 1);
+				send (sock_conn, "LED2ON/LED3ON-команды включения светодиодов \n \r", strlen ("LED2ON/LED3ON-команды включения светодиодов \n \r"), 1);
+				send (sock_conn, "LED2OFF/LED3OFF-команды выключения светодиодов \n \r", strlen ("LED2OFF/LED3OFF-команды выключения светодиодов \n \r"), 1);
+				send (sock_conn, "STAT-команда для вывода состояния светодиодов \n \r", strlen ("STAT-команда для вывода состояния светодиодов \n \r"), 1);
+				send (sock_conn, "EXT-завершить сеанс \n \r", strlen ("EXT-завершить сеанс \n \r"), 1);
+				send (sock_conn, "--------------------- \n \r", strlen ("--------------------- \n \r"), 1);
+				return 0;
+			}
+			return 0;
+}
+
+
+void server_thread (int sock_fd,int sock_conn,struct sockaddr_in server_addr,struct sockaddr_in conn_addr,socklen_t addr_len)
 {
-	struct sockaddr_in server_addr; // адрес сервера
-	struct sockaddr_in conn_addr; // адрес подключения
-	int sock_fd; // Сервер подключения
-	int sock_conn; // запрошенный socket
-	socklen_t addr_len; // длина адреса
-	int err;
-	int length;
-	int num;
-
-	int closed = 0; //флаг для проверки сокета клиента
-
-	 sock_fd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // установить новое соединение с сокетом
-	 memset (& server_addr, 0, sizeof (server_addr)); // Очистить адрес сервера
-	 server_addr.sin_family = AF_INET; // семейство адресов
-	 server_addr.sin_addr.s_addr = htonl (INADDR_ANY);
-	 server_addr.sin_port = htons (SERVER_PORT);
-
-	 err = bind (sock_fd, (struct sockaddr *) & server_addr, sizeof (server_addr));
-	 if (err <0) // Закрыть сокет, если привязка не удалась
+	 int closed = 0;
+	 int length;
+	 int num;
+	 while (1)//TODO:исправить, то что сервер читает escape последовательности
 	 {
-			 closesocket (sock_fd);
-	 }
 
-	 err = listen (sock_fd, 1); // прослушивание запросов на подключение
-	 if (err <0) // Закрыть сокет, если прослушивание не удалось
-	 {
-			 closesocket (sock_fd);
-	 }
-	 addr_len = sizeof (struct sockaddr_in);
-
-	 sock_conn = accept (sock_fd, (struct sockaddr *) & conn_addr, & addr_len); // Подключиться к прослушиваемому запросу и присвоить статус sock_conn
-
-	 if (sock_conn <0) // Если состояние меньше 0, это указывает на то, что соединение неисправно
-	 {
-		closesocket(sock_fd);
-	 }
-	 else send (sock_conn, "connect success! \n \r", 22, 0);
-
-	while (1)//TODO:исправить, то что сервер читает escape последовательности
-	{
-		if (closed==1){ //если сокет клиента закрыт позволяем ему переподлючиться
+		if (closed==1){//если сокет клиента закрыт позволяем ему переподлючиться
 			sock_conn = accept (sock_fd, (struct sockaddr *) & conn_addr, & addr_len); // Подключиться к прослушиваемому запросу и присвоить статус sock_conn
 
 			if (sock_conn <0) // Если состояние меньше 0, это указывает на то, что соединение неисправно
@@ -377,63 +405,16 @@ static void server_thread (void * p_arg)
 		memset (data_buffer, 0, sizeof (data_buffer)); // Очистить приемный буфер
 
 		length = recv (sock_conn, (unsigned int *) data_buffer, 100, 0); // помещаем полученные данные в приемный буфер
-        	if(length == 0){
-        		continue;
-        	}
+        if(length == 0){
+        	continue;
+        }
 
 		for (num = 0; num <100; num ++)
 		{
 			tcp_server_recvbuf[num]=data_buffer[num];
 		}
+		closed = message_process(tcp_server_recvbuf, sock_conn);
 
-		if(tcp_server_recvbuf[0] == NULL){
-			send (sock_conn, "empty message \n ", strlen ("empty message \n"), 1);
-		}
-		else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='2' & tcp_server_recvbuf[4]=='O' & tcp_server_recvbuf[5]=='F' & tcp_server_recvbuf[5]=='F')
-		{
-			HAL_GPIO_WritePin (GPIOB, LD2_Pin, GPIO_PIN_RESET);
-			send (sock_conn, "LED2 выключен \n \r", strlen ("LED2 выключен \n \r"), 1);
-	    }
-		else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='2' & tcp_server_recvbuf[4]=='O' & tcp_server_recvbuf[5]=='N')
-		{
-			HAL_GPIO_WritePin (GPIOB, LD2_Pin, GPIO_PIN_SET);
-			send (sock_conn, "LED2 включен \n \r",  strlen("LED2 включен \n \r"),1);
-		}
-		else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='3' & tcp_server_recvbuf[4]=='O' & tcp_server_recvbuf[5]=='F' & tcp_server_recvbuf[5]=='F')
-		{
-			HAL_GPIO_WritePin (GPIOB, LD3_Pin, GPIO_PIN_RESET);
-			send (sock_conn, "LED3 выключен \n \r", strlen("LED3 выключен \n \r"), 1);
-		}
-		else if(tcp_server_recvbuf[0]=='L' & tcp_server_recvbuf[1]=='E'&tcp_server_recvbuf[2]=='D' & tcp_server_recvbuf[3]=='3'&tcp_server_recvbuf[4]=='O'&tcp_server_recvbuf[5]=='N')
-		{
-			HAL_GPIO_WritePin (GPIOB, LD3_Pin, GPIO_PIN_SET);
-			send (sock_conn, "LED3 включен \n \r", strlen("LED3 включен \n \r"), 1);
-		}
-		else if(tcp_server_recvbuf[0] =='S' & tcp_server_recvbuf[1]=='T' & tcp_server_recvbuf[2]=='A' & tcp_server_recvbuf[3]=='T'){
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET &HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_SET){
-				send (sock_conn, "LED2 и LED3 включен \n \r", strlen("LED2 и LED3 включен \n \r"), 1);
-			}
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_SET){
-				send (sock_conn, "LED2 включен и LED3 включен \n \r", strlen("LED2 включен и LED3 включен \n \r"), 1);
-			}
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_RESET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_RESET){
-				send (sock_conn, "LED2 и LED3 выключен \n \r", strlen ("LED2 и LED3 выключен \n \r"), 1);
-			}
-			if(HAL_GPIO_ReadPin(GPIOB, LD2_Pin) == GPIO_PIN_SET & HAL_GPIO_ReadPin(GPIOB, LD3_Pin) ==GPIO_PIN_RESET){
-				send (sock_conn, "LED2 включен и LED3 выключен \n \r", strlen ("LED2 включен и LED3 выключен \n \r"), 1);
-			}
-		}
-		else if(tcp_server_recvbuf[0] =='E' & tcp_server_recvbuf[1]=='X' & tcp_server_recvbuf[2]=='T'){
-			closesocket(sock_conn);
-		}
-		else if(tcp_server_recvbuf[0] =='H' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='L' & tcp_server_recvbuf[3]=='P'){
-			send (sock_conn, "--------------------- \n \r", strlen ("--------------------- \n \r"), 1);
-			send (sock_conn, "LED2ON/LED3ON-команды включения светодиодов \n \r", strlen ("LED2ON/LED3ON-команды включения светодиодов \n \r"), 1);
-			send (sock_conn, "LED2OFF/LED3OFF-команды выключения светодиодов \n \r", strlen ("LED2OFF/LED3OFF-команды выключения светодиодов \n \r"), 1);
-			send (sock_conn, "STAT-команда для вывода состояния светодиодов \n \r", strlen ("STAT-команда для вывода состояния светодиодов \n \r"), 1);
-			send (sock_conn, "EXT-завершить сеанс \n \r", strlen ("EXT-завершить сеанс \n \r"), 1);
-			send (sock_conn, "--------------------- \n \r", strlen ("--------------------- \n \r"), 1);
-		}
 		/*
 		else{
 			send (sock_conn, "неправильная команда для вывод списка команд введите HELP \n \r", strlen ("неправильная команда для вывод списка команд введите HELP \n \r"), 1);
@@ -441,10 +422,11 @@ static void server_thread (void * p_arg)
 	}
 }
 
- void tcp_serv_init (void) // инициализация TCP-сервера
+ void tcp_serv_init (char trd_name[],int sock_fd,int sock_conn,struct sockaddr_in server_addr,struct sockaddr_in conn_addr,socklen_t addr_len) // инициализация TCP-сервера
 {
-	sys_thread_new("tcp_server_thread",  server_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO - 1);
+	sys_thread_new(trd_name,  server_thread, (sock_fd,sock_conn,server_addr,conn_addr,addr_len), DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO - 1);
 }
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -459,11 +441,49 @@ void StartDefaultTask(void const * argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
+  char thread_name = "tcp_server_thread";
+  int trd_cnt = '0'; //модификатор названия создаваемого потока
+  struct sockaddr_in server_addr; // адрес сервера
+  struct sockaddr_in conn_addr; // адрес подключения
+  int sock_fd; // Сервер подключения
+  int sock_conn; // запрошенный socket
+  int err;
+  int num;
+  socklen_t addr_len;
+
+
+  int closed = 0; //флаг для проверки сокета клиента
+
+
+  sock_fd = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); // установить новое соединение с сокетом
+  memset (& server_addr, 0, sizeof (server_addr)); // Очистить адрес сервера
+  server_addr.sin_family = AF_INET; // семейство адресов
+  server_addr.sin_addr.s_addr = htonl (INADDR_ANY);
+  server_addr.sin_port = htons (SERVER_PORT);
+
+  err = bind (sock_fd, (struct sockaddr *) & server_addr, sizeof (server_addr));
+  if (err <0) // Закрыть сокет, если привязка не удалась
+  {
+  		closesocket (sock_fd);
+  }
+
+  err = listen (sock_fd, 1); // прослушивание запросов на подключение
+  if (err <0) // Закрыть сокет, если прослушивание не удалось
+  {
+  		closesocket (sock_fd);
+  }
+  addr_len = sizeof (struct sockaddr_in);
   /* Infinite loop */
   for(;;)
   {
-	tcp_serv_init();
-    osDelay(100);
+	sock_conn = accept (sock_fd, (struct sockaddr *) & conn_addr, & addr_len);
+	if(sock_conn == ERR_OK){
+		send (sock_conn, "connect success! \n \r", 22, 0);
+		tcp_serv_init(thread_name + trd_cnt,sock_fd,sock_conn,server_addr,conn_addr,addr_len);
+	}
+	else{
+
+	}
   }
   /* USER CODE END 5 */
 }
