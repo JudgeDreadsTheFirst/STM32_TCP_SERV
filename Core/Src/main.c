@@ -424,6 +424,7 @@ static void server_thread (void * p_arg)
 			}
 		}
 		else if(tcp_server_recvbuf[0] =='E' & tcp_server_recvbuf[1]=='X' & tcp_server_recvbuf[2]=='T'){
+			closed = 1;
 			closesocket(sock_conn);
 		}
 		else if(tcp_server_recvbuf[0] =='H' & tcp_server_recvbuf[1]=='E' & tcp_server_recvbuf[2]=='L' & tcp_server_recvbuf[3]=='P'){
