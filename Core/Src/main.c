@@ -67,6 +67,9 @@ void StartDefaultTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int message_process(char tcp_server_recvbuf[],int sock_conn);
+static void server_thread (int sock_fd,int sock_conn,struct sockaddr_in server_addr,struct sockaddr_in conn_addr,socklen_t addr_len);
+void tcp_serv_init (char trd_name[],int sock_fd,int sock_conn,struct sockaddr_in server_addr,struct sockaddr_in conn_addr,socklen_t addr_len);
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 /* USER CODE END 0 */
 
@@ -320,7 +323,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	}
 
 }
-
 int message_process(char tcp_server_recvbuf[],int sock_conn){// Переписать эту функцию по нормальному
 
 			if(tcp_server_recvbuf[0] == 0){//TODO: исправить проверку сообщений
@@ -383,25 +385,13 @@ int message_process(char tcp_server_recvbuf[],int sock_conn){// Переписа
 }
 
 
-void server_thread (int sock_fd,int sock_conn,struct sockaddr_in server_addr,struct sockaddr_in conn_addr,socklen_t addr_len)
+static void server_thread (int sock_fd,int sock_conn,struct sockaddr_in server_addr,struct sockaddr_in conn_addr,socklen_t addr_len)
 {
 	 int closed = 0;
 	 int length;
 	 int num;
 	 while (1)//TODO:исправить, то что сервер читает escape последовательности
 	 {
-
-		if (closed==1){//если сокет клиента закрыт позволяем ему переподлючиться
-			sock_conn = accept (sock_fd, (struct sockaddr *) & conn_addr, & addr_len); // Подключиться к прослушиваемому запросу и присвоить статус sock_conn
-
-			if (sock_conn <0) // Если состояние меньше 0, это указывает на то, что соединение неисправно
-			{
-				closesocket(sock_fd);
-			}
-			else send (sock_conn, "connect success! \n \r", 22, 0);
-
-			closed = 0;
-		}
 		memset (data_buffer, 0, sizeof (data_buffer)); // Очистить приемный буфер
 
 		length = recv (sock_conn, (unsigned int *) data_buffer, 100, 0); // помещаем полученные данные в приемный буфер
@@ -441,8 +431,8 @@ void StartDefaultTask(void const * argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
-  char thread_name = "tcp_server_thread";
-  int trd_cnt = '0'; //модификатор названия создаваемого потока
+  char *thread_head = "tcp_server_thread";
+  char *trd_cnt = "0"; //модификатор названия создаваемого потока
   struct sockaddr_in server_addr; // адрес сервера
   struct sockaddr_in conn_addr; // адрес подключения
   int sock_fd; // Сервер подключения
@@ -479,15 +469,19 @@ void StartDefaultTask(void const * argument)
 	sock_conn = accept (sock_fd, (struct sockaddr *) & conn_addr, & addr_len);
 	if(sock_conn == ERR_OK){
 		send (sock_conn, "connect success! \n \r", 22, 0);
-		tcp_serv_init(thread_name + trd_cnt,sock_fd,sock_conn,server_addr,conn_addr,addr_len);
+		char *res[strlen(thread_head)+strlen(trd_cnt)+1];
+		strcpy(res,thread_head);
+		strcat(res,trd_cnt);
+		tcp_serv_init(res,sock_fd,sock_conn,server_addr,conn_addr,addr_len);
+		trd_cnt[0] +=1;
+		free(res);
 	}
 	else{
-
+		closesocket(sock_conn);
 	}
   }
   /* USER CODE END 5 */
 }
-
 /**
   * @brief  Period elapsed callback in non blocking mode
   * @note   This function is called  when TIM1 interrupt took place, inside
